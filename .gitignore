@@ -21,6 +21,8 @@ youtube-audio-extractor
 *.mp4
 *.mp3
 *.m4a
+*.webm
+*.opus
 
 # FFmpeg binaries (will be embedded, but ignore if downloaded)
 binaries/ffmpeg-*
