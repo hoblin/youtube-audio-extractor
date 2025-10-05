@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 	"github.com/kkdai/youtube/v2"
 	"github.com/kkdai/youtube/v2/downloader"
 )
@@ -59,23 +62,61 @@ func downloadAudio(videoURL, outputPath string) error {
 }
 
 func main() {
-	fmt.Println("YouTube Audio Extractor")
+	a := app.New()
+	w := a.NewWindow("YouTube Audio Extractor")
+	w.Resize(fyne.NewSize(600, 200))
 
-	// Example usage (will be replaced with GUI)
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: youtube-audio-extractor <video-url>")
-		os.Exit(1)
-	}
+	// URL input
+	urlEntry := widget.NewEntry()
+	urlEntry.SetPlaceHolder("Enter YouTube URL here...")
 
-	videoURL := os.Args[1]
-	outputPath := filepath.Join(".", "audio.m4a")
+	// Status label
+	statusLabel := widget.NewLabel("Ready to download")
+	statusLabel.Wrapping = fyne.TextWrapWord
 
-	fmt.Printf("Downloading audio from: %s\n", videoURL)
-	err := downloadAudio(videoURL, outputPath)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
+	// Download button - declare first so it can be referenced in callback
+	var downloadBtn *widget.Button
+	downloadBtn = widget.NewButton("Download Audio", func() {
+		url := urlEntry.Text
+		if url == "" {
+			statusLabel.SetText("Error: Please enter a YouTube URL")
+			return
+		}
 
-	fmt.Printf("Audio downloaded successfully to: %s\n", outputPath)
+		// Disable button during download
+		downloadBtn.Disable()
+		statusLabel.SetText("Downloading...")
+
+		// Download in goroutine to keep UI responsive
+		go func() {
+			outputPath := filepath.Join(".", "audio.m4a")
+			err := downloadAudio(url, outputPath)
+
+			// Update UI in main thread using fyne.Do
+			if err != nil {
+				fyne.Do(func() {
+					statusLabel.SetText(fmt.Sprintf("Error: %v", err))
+					downloadBtn.Enable()
+				})
+			} else {
+				fyne.Do(func() {
+					statusLabel.SetText(fmt.Sprintf("Success! Downloaded to: %s", outputPath))
+					downloadBtn.Enable()
+				})
+			}
+		}()
+	})
+
+	// Layout
+	content := container.NewVBox(
+		widget.NewLabel("YouTube Audio Extractor"),
+		widget.NewSeparator(),
+		urlEntry,
+		downloadBtn,
+		widget.NewSeparator(),
+		statusLabel,
+	)
+
+	w.SetContent(content)
+	w.ShowAndRun()
 }
