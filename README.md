@@ -83,6 +83,21 @@ youtube-audio-extractor/
 go run main.go
 ```
 
+## Release Process
+
+This project uses automated releases:
+
+- **Automatic Minor Releases**: Every push to `main` automatically increments the minor version (e.g., v1.0.0 → v1.1.0 → v1.2.0) and creates a release with binaries for all platforms.
+- **Manual Major Releases**: For major version bumps (e.g., v1.x.x → v2.0.0), manually create and push a tag:
+  ```bash
+  git tag v2.0.0
+  git push origin v2.0.0
+  ```
+
+GitHub Actions will automatically build binaries for:
+- Linux (amd64, arm64)
+- macOS (amd64, arm64)
+
 ## License
 
 MIT
