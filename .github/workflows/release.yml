@@ -54,7 +54,22 @@ jobs:
         run: |
           go build -o youtube-audio-extractor -ldflags="-s -w"
 
-      - name: Create zip archive
+      - name: Create macOS .app bundle
+        if: matrix.goos == 'darwin'
+        run: |
+          mkdir -p "YouTube Audio Extractor.app/Contents/MacOS"
+          mkdir -p "YouTube Audio Extractor.app/Contents/Resources"
+          cp youtube-audio-extractor "YouTube Audio Extractor.app/Contents/MacOS/"
+          cp Info.plist "YouTube Audio Extractor.app/Contents/"
+          chmod +x "YouTube Audio Extractor.app/Contents/MacOS/youtube-audio-extractor"
+
+      - name: Create zip archive (macOS)
+        if: matrix.goos == 'darwin'
+        run: |
+          zip -r ${{ matrix.output }}.zip "YouTube Audio Extractor.app"
+
+      - name: Create zip archive (Linux)
+        if: matrix.goos == 'linux'
         run: |
           zip ${{ matrix.output }}.zip youtube-audio-extractor
 
