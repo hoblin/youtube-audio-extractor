@@ -38,6 +38,29 @@ func isYouTubeURL(url string) bool {
 	return youtubeRegex.MatchString(url)
 }
 
+// cleanYouTubeURL removes tracking parameters from YouTube URLs
+func cleanYouTubeURL(url string) string {
+	// Remove all query parameters except v= for /watch URLs
+	if strings.Contains(url, "?") {
+		parts := strings.Split(url, "?")
+		baseURL := parts[0]
+
+		// If it's a /watch URL, preserve only the v= parameter
+		if strings.Contains(url, "/watch") && len(parts) > 1 {
+			params := strings.Split(parts[1], "&")
+			for _, param := range params {
+				if strings.HasPrefix(param, "v=") {
+					return baseURL + "?" + param
+				}
+			}
+		}
+
+		// For youtu.be links, just return the base URL
+		return baseURL
+	}
+	return url
+}
+
 // sanitizeFilename creates a safe filename from a string
 func sanitizeFilename(name string) string {
 	// Remove invalid filename characters
@@ -173,6 +196,17 @@ func main() {
 		// Download in goroutine to keep UI responsive
 		go func() {
 			outputPath, err := downloadAudio(url, outputDir)
+
+			// If 403 error, retry with cleaned URL
+			if err != nil && strings.Contains(err.Error(), "403") {
+				cleanedURL := cleanYouTubeURL(url)
+				if cleanedURL != url {
+					fyne.Do(func() {
+						statusLabel.SetText("Got 403 error, retrying with sanitized URL...")
+					})
+					outputPath, err = downloadAudio(cleanedURL, outputDir)
+				}
+			}
 
 			// Update UI in main thread using fyne.Do
 			if err != nil {
