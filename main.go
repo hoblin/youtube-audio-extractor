@@ -1,51 +1,60 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/kkdai/youtube/v2"
+	"github.com/kkdai/youtube/v2/downloader"
 )
 
-// downloadVideo downloads a YouTube video to the specified output path
-func downloadVideo(videoURL, outputPath string) error {
-	client := youtube.Client{}
+// downloadAudio downloads audio from a YouTube video
+func downloadAudio(videoURL, outputPath string) error {
+	dl := downloader.Downloader{
+		OutputDir: filepath.Dir(outputPath),
+	}
 
-	video, err := client.GetVideo(videoURL)
+	video, err := dl.GetVideo(videoURL)
 	if err != nil {
 		return fmt.Errorf("failed to get video info: %w", err)
 	}
 
-	// Get the highest quality format with both video and audio
-	formats := video.Formats.WithAudioChannels()
+	fmt.Printf("Title: %s\n", video.Title)
+	fmt.Printf("Duration: %s\n", video.Duration)
+
+	// Get audio-only formats
+	formats := video.Formats.Type("audio")
 	if len(formats) == 0 {
-		return fmt.Errorf("no formats with audio found")
+		return fmt.Errorf("no audio formats found")
 	}
 
-	// Select the first format (usually highest quality)
-	format := formats[0]
+	fmt.Printf("Found %d audio formats\n", len(formats))
 
-	stream, _, err := client.GetStream(video, &format)
+	// Select the best audio format (highest bitrate)
+	var selectedFormat *youtube.Format
+	var maxBitrate int
+	for i := range formats {
+		format := &formats[i]
+		if format.Bitrate > maxBitrate {
+			maxBitrate = format.Bitrate
+			selectedFormat = format
+		}
+	}
+
+	if selectedFormat == nil {
+		selectedFormat = &formats[0]
+	}
+
+	fmt.Printf("Downloading audio: %s (Bitrate: %d)\n", selectedFormat.MimeType, selectedFormat.Bitrate)
+
+	err = dl.Download(context.Background(), video, selectedFormat, filepath.Base(outputPath))
 	if err != nil {
-		return fmt.Errorf("failed to get stream: %w", err)
-	}
-	defer stream.Close()
-
-	// Create output file
-	file, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer file.Close()
-
-	// Copy stream to file
-	_, err = io.Copy(file, stream)
-	if err != nil {
-		return fmt.Errorf("failed to download video: %w", err)
+		return fmt.Errorf("failed to download audio: %w", err)
 	}
 
+	fmt.Println("Download complete!")
 	return nil
 }
 
@@ -59,14 +68,14 @@ func main() {
 	}
 
 	videoURL := os.Args[1]
-	outputPath := filepath.Join(".", "video.mp4")
+	outputPath := filepath.Join(".", "audio.m4a")
 
-	fmt.Printf("Downloading video from: %s\n", videoURL)
-	err := downloadVideo(videoURL, outputPath)
+	fmt.Printf("Downloading audio from: %s\n", videoURL)
+	err := downloadAudio(videoURL, outputPath)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Video downloaded successfully to: %s\n", outputPath)
+	fmt.Printf("Audio downloaded successfully to: %s\n", outputPath)
 }
