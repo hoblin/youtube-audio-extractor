@@ -38,30 +38,6 @@ func isYouTubeURL(url string) bool {
 	return youtubeRegex.MatchString(url)
 }
 
-// cleanYouTubeURL removes tracking parameters from YouTube URLs
-func cleanYouTubeURL(url string) string {
-	// Remove si= and other tracking parameters
-	// Keep only the essential video ID
-	if strings.Contains(url, "?") {
-		parts := strings.Split(url, "?")
-		baseURL := parts[0]
-
-		// If it's a /watch URL, preserve the v= parameter
-		if strings.Contains(url, "/watch") && len(parts) > 1 {
-			params := strings.Split(parts[1], "&")
-			for _, param := range params {
-				if strings.HasPrefix(param, "v=") {
-					return baseURL + "?" + param
-				}
-			}
-		}
-
-		// For youtu.be links, just return the base URL
-		return baseURL
-	}
-	return url
-}
-
 // sanitizeFilename creates a safe filename from a string
 func sanitizeFilename(name string) string {
 	// Remove invalid filename characters
@@ -120,11 +96,21 @@ func downloadAudio(videoURL, outputDir string) (string, error) {
 	filename := fmt.Sprintf("%s - %s.m4a", safeAuthor, safeTitle)
 
 	err = dl.Download(context.Background(), video, selectedFormat, filename)
+	outputPath := filepath.Join(outputDir, filename)
+
 	if err != nil {
+		// Clean up failed download file if it exists
+		os.Remove(outputPath)
 		return "", err
 	}
 
-	outputPath := filepath.Join(outputDir, filename)
+	// Verify the file was actually downloaded and has content
+	fileInfo, err := os.Stat(outputPath)
+	if err != nil || fileInfo.Size() == 0 {
+		os.Remove(outputPath)
+		return "", fmt.Errorf("download failed: file is empty or missing")
+	}
+
 	fmt.Println("Download complete!")
 	return outputPath, nil
 }
@@ -177,9 +163,6 @@ func main() {
 			return
 		}
 
-		// Clean URL to remove tracking parameters
-		cleanURL := cleanYouTubeURL(url)
-
 		// Disable button during download
 		downloadBtn.Disable()
 		chooseDirBtn.Disable()
@@ -187,7 +170,7 @@ func main() {
 
 		// Download in goroutine to keep UI responsive
 		go func() {
-			outputPath, err := downloadAudio(cleanURL, outputDir)
+			outputPath, err := downloadAudio(url, outputDir)
 
 			// Update UI in main thread using fyne.Do
 			if err != nil {
