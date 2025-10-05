@@ -118,24 +118,21 @@ func downloadAudio(videoURL, outputDir string) (string, error) {
 func main() {
 	a := app.New()
 	w := a.NewWindow("YouTube Audio Extractor")
-	w.Resize(fyne.NewSize(650, 250))
+	w.Resize(fyne.NewSize(650, 280))
 
 	// Output directory (default to ~/Downloads if it exists, otherwise current directory)
 	outputDir := getDefaultDownloadDir()
 
-	// URL input
+	// URL input - make it multiline for better visibility
 	urlEntry := widget.NewEntry()
-	urlEntry.SetPlaceHolder("Enter YouTube URL here...")
+	urlEntry.SetPlaceHolder("Paste YouTube URL here...")
 
-	// Output directory label
-	dirLabel := widget.NewLabel("Output: " + outputDir)
-
-	// Status label
-	statusLabel := widget.NewLabel("Ready to download")
-	statusLabel.Wrapping = fyne.TextWrapWord
+	// Output directory section
+	dirLabel := widget.NewLabel("📁 " + outputDir)
+	dirLabel.Wrapping = fyne.TextWrapWord
 
 	// Choose directory button
-	chooseDirBtn := widget.NewButton("Choose Output Folder", func() {
+	chooseDirBtn := widget.NewButton("Choose Folder...", func() {
 		dialog.ShowFolderOpen(func(uri fyne.ListableURI, err error) {
 			if err != nil {
 				dialog.ShowError(err, w)
@@ -143,14 +140,19 @@ func main() {
 			}
 			if uri != nil {
 				outputDir = uri.Path()
-				dirLabel.SetText("Output: " + outputDir)
+				dirLabel.SetText("📁 " + outputDir)
 			}
 		}, w)
 	})
+	chooseDirBtn.Importance = widget.LowImportance
+
+	// Status label
+	statusLabel := widget.NewLabel("Ready to download")
+	statusLabel.Wrapping = fyne.TextWrapWord
 
 	// Download button - declare first so it can be referenced in callback
 	var downloadBtn *widget.Button
-	downloadBtn = widget.NewButton("Download Audio", func() {
+	downloadBtn = widget.NewButton("⬇ Download Audio", func() {
 		url := urlEntry.Text
 		if url == "" {
 			statusLabel.SetText("Error: Please enter a YouTube URL")
@@ -188,13 +190,16 @@ func main() {
 			}
 		}()
 	})
+	downloadBtn.Importance = widget.HighImportance
 
-	// Layout
+	// Layout with better spacing and hierarchy
 	content := container.NewVBox(
 		widget.NewLabel("YouTube Audio Extractor"),
 		widget.NewSeparator(),
 		urlEntry,
-		container.NewHBox(downloadBtn, chooseDirBtn),
+		downloadBtn,
+		widget.NewSeparator(),
+		container.NewHBox(widget.NewLabel("Save to:"), chooseDirBtn),
 		dirLabel,
 		widget.NewSeparator(),
 		statusLabel,
