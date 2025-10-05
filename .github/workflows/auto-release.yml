@@ -1,4 +1,4 @@
-name: Auto Release
+name: Auto Build and Release
 
 on:
   push:
@@ -8,21 +8,23 @@ permissions:
   contents: write
 
 jobs:
-  auto-release:
-    name: Auto Release on Main
+  release:
+    name: Auto Build and Release
     runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.get_tag.outputs.new_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
+      - name: Get latest tag and bump version
         id: get_tag
         run: |
           # Get the latest tag, or default to v0.0.0 if none exists
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
 
           # Parse version components
           VERSION=${LATEST_TAG#v}
@@ -35,22 +37,84 @@ jobs:
           NEW_TAG="v${MAJOR}.${NEW_MINOR}.0"
 
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "Latest tag: $LATEST_TAG"
-          echo "New tag: $NEW_TAG"
+          echo "New tag will be: $NEW_TAG"
 
-      - name: Check if tag already exists
-        id: check_tag
-        run: |
-          if git rev-parse "${{ steps.get_tag.outputs.new_tag }}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
+  build:
+    name: Build for ${{ matrix.os }}
+    needs: release
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            output: youtube-audio-extractor-linux-amd64
+          - os: macos
+            runner: macos-latest
+            goos: darwin
+            goarch: amd64
+            output: youtube-audio-extractor-darwin-amd64
+          - os: macos-arm64
+            runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            output: youtube-audio-extractor-darwin-arm64
 
-      - name: Create and push tag
-        if: steps.check_tag.outputs.exists == 'false'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install dependencies (Linux)
+        if: matrix.goos == 'linux'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a ${{ steps.get_tag.outputs.new_tag }} -m "Auto release ${{ steps.get_tag.outputs.new_tag }}"
-          git push origin ${{ steps.get_tag.outputs.new_tag }}
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+        run: |
+          go build -o ${{ matrix.output }} -ldflags="-s -w"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: ${{ matrix.output }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure
+        run: ls -R ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.release.outputs.new_tag }}
+          name: Release ${{ needs.release.outputs.new_tag }}
+          files: ./artifacts/**/youtube-audio-extractor-*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
