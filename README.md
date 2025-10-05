@@ -20,7 +20,20 @@ A simple cross-platform GUI application for downloading audio from YouTube video
 
 ### From Releases
 
-Download the latest release for your platform from the [Releases](https://github.com/hoblin/youtube-audio-extractor/releases) page.
+1. Download the latest release for your platform from the [Releases](https://github.com/hoblin/youtube-audio-extractor/releases) page:
+   - `youtube-audio-extractor-linux-amd64.zip` - Linux (Intel/AMD)
+   - `youtube-audio-extractor-darwin-amd64.zip` - macOS (Intel)
+   - `youtube-audio-extractor-darwin-arm64.zip` - macOS (Apple Silicon)
+
+2. Extract the zip file:
+   ```bash
+   unzip youtube-audio-extractor-*.zip
+   ```
+
+3. Run the application:
+   ```bash
+   ./youtube-audio-extractor
+   ```
 
 ### From Source
 
